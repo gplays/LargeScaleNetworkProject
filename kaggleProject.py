@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import igraph
+import os.path as path
 #import gensim
 #import graph_tool.all as gt
 from sklearn import svm
@@ -19,8 +20,8 @@ nltk.download('punkt') # for tokenization
 nltk.download('stopwords')
 stpwds = set(nltk.corpus.stopwords.words("english"))
 stemmer = nltk.stem.PorterStemmer()
-path = "C:\\Users\\Guillaume\\Desktop\\kaggle\\"
-#path = "/media/plays/Windows8_OS/Users/Guillaume/Desktop/kaggle"
+path.join()
+
 with open(path + "testing_set.txt", "r") as f:
     reader = csv.reader(f)
     testing_set  = list(reader)
@@ -75,8 +76,8 @@ vectorizer = TfidfVectorizer(stop_words="english")
 # each row is a node in the order of node_info
 features_TFIDF = vectorizer.fit_transform(corpus)
 
-#load Google word2vec module the use of word2vec was abandonned during the
-# project
+#load Google word2vec module
+# NB: the use of word2vec was abandonned during the project
 #model = gensim.models.word2vec.Word2Vec(corpus, min_count=1)
 #model = gensim.models.Word2Vec(iter=1)  # an empty model, no training yet
 #model.build_vocab(corpus)  # can be a non-repeatable, 1-pass generator
@@ -146,7 +147,7 @@ adhesion = []
 pageRankP = []
 pageRankTarget = []
 counter = 0
-for i in xrange(len(training_set_reduced)):
+for i in range(len(training_set_reduced)):
     source = training_set_reduced[i][0]
     target = training_set_reduced[i][1]
 
@@ -178,7 +179,7 @@ for i in xrange(len(training_set_reduced)):
     adhesion.append(g.adhesion(source=index_source, target=index_target)-1)
     counter += 1
     if counter % 1000 == True:
-        print counter, "training examples processed"
+        print(counter, "training examples processed")
 
 # convert list of lists into array
 # documents as rows, unique words as columns (i.e., example as rows, features as columns)
@@ -214,7 +215,7 @@ pageRankTarget_test = []
 adhesion_test = []
 
 counter = 0
-for i in xrange(len(testing_set)):
+for i in range(len(testing_set)):
     source = testing_set[i][0]
     target = testing_set[i][1]
 
@@ -250,7 +251,7 @@ for i in xrange(len(testing_set)):
     adhesion_test.append(g.adhesion(source=index_source, target=index_target))
     counter += 1
     if counter % 1000 == True:
-        print counter, "testing examples processed"
+        print(counter, "testing examples processed")
 
 # convert list of lists into array
 # documents as rows, unique words as columns (i.e., example as rows, features as columns)
