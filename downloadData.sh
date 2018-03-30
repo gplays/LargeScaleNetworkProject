@@ -1,5 +1,5 @@
-mkdir data
-cd data
+mkdir .data
+cd .data
 wget https://static.aminer.org/lab-datasets/citation/dblp.v10.zip
 sudo apt-get install unzip
 unzip dblp.v10.zip
