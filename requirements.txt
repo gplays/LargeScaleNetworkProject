@@ -1,5 +1,5 @@
 numpy
-igraph
+python-igraph
 sklearn
 nltk
 networkx
