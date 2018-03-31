@@ -8,7 +8,8 @@ try:
     import graph_tool.all as gt
 except ModuleNotFoundError:
     gt = None
-from preprocessing import DEFAULT_DATASET, get_data_path, preprocess
+from preprocessing import (DEFAULT_DATASET, get_data_path, preprocess,
+                           maybe_load_raw)
 
 IGRAPH = True
 VALUE_TYPES = {"title": "string",
@@ -49,8 +50,10 @@ def load_or_create_graph(try_load=True, write=True, withIgraph=IGRAPH,
         parsed_data = preprocess(data_path=data_path, dataset=dataset,
                                  version=version)
         graph = create_graph(parsed_data, withIgraph, out_dir, dump_graph=write)
+    else:
+        parsed_data = maybe_load_raw(data_path)
 
-    return graph
+    return graph, parsed_data
 
 
 def maybe_load_graph(data_path, withIgraph):
@@ -183,14 +186,14 @@ def add_edges_attributes(g, attr, vals, withIgraph=True,
     """
 
     if withIgraph:
-        g.vs[attr] = vals
+        g.es[attr] = vals
         # magic alias
-        g.e = g.vs
+        g.e = g.es
     else:
         if value_type is None:
             value_type = VALUE_TYPES.get(attr, None)
         assert value_type is not None, "with graph tool you need to provide \
                                         the value_type"
-        g.ep[attr] = gt.new_vp(value_type, vals=vals)
+        g.ep[attr] = gt.new_ep(value_type, vals=vals)
         # magic alias
-        g.v = g.vp
+        g.e = g.ep

@@ -79,11 +79,11 @@ def read_v10(data_path):
                     paper = json.loads(line)
                     idx = ledger.id2idx(paper["id"])
                     papers[idx]({"title": paper.get("title", ''),
-                                   "authors": paper.get("authors", []),
-                                   "venue": paper.get("venue", ''),
-                                   "year": paper.get("year", 0),
-                                   "abstract": paper.get("abstract", ''),
-                                   })
+                                 "authors": paper.get("authors", []),
+                                 "venue": paper.get("venue", ''),
+                                 "year": paper.get("year", 0),
+                                 "abstract": paper.get("abstract", ''),
+                                 })
 
                     safe_append(first_authors, paper["authors"][0], idx)
 
@@ -150,12 +150,12 @@ def read_v8(data_path):
                 if "!" == line[1]:
                     abstract = line[2:-1]
             else:
-                papers.append({"title": title,
+                papers[idx] = {"title": title,
                                "authors": authors,
                                "venue": venue,
                                "year": year,
                                "abstract": abstract,
-                               })
+                               }
                 try:
                     safe_append(first_authors, authors[0], idx)
                 except IndexError:
@@ -163,7 +163,6 @@ def read_v8(data_path):
                 for author in authors:
                     safe_append(collaboration_authors, author, idx)
 
-                idx += 1
                 paper_id, title, authors, venue, year, abstract = (-1, '', [],
                                                                    '', 0, '')
 
