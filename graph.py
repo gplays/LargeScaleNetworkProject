@@ -158,3 +158,39 @@ def add_vertices_attributes(g, attr, vals, withIgraph=True,
         g.vp[attr] = gt.new_vp(value_type, vals=vals)
         # magic alias
         g.v = g.vp
+
+
+def add_edges_attributes(g, attr, vals, withIgraph=True,
+                            value_type=None):
+    """
+    Add attributes directly to the vertices of the graph using their own API
+    Afterward values of attributes can be read/write through .v attribute of
+    the graph indifferently
+    :param g: The graph object
+    :type g:
+    :param attr: name of the attribute
+    :type attr: str
+    :param vals: Values for the attributes
+    :type vals: list
+    :param withIgraph: set to True to use igraph library else graph-tool is
+    used
+    :type withIgraph: bool
+    :param value_type: for graph tool need to give indication on data type
+    for more efficient handling (C backend)
+    :type value_type: str
+    :return:
+    :rtype:
+    """
+
+    if withIgraph:
+        g.vs[attr] = vals
+        # magic alias
+        g.e = g.vs
+    else:
+        if value_type is None:
+            value_type = VALUE_TYPES.get(attr, None)
+        assert value_type is not None, "with graph tool you need to provide \
+                                        the value_type"
+        g.ep[attr] = gt.new_vp(value_type, vals=vals)
+        # magic alias
+        g.v = g.vp

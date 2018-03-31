@@ -65,7 +65,7 @@ def read_v10(data_path):
     :return:
     :rtype:
     """
-    papers = []
+    papers = {}
     first_authors = {}
     collaboration_authors = {}
     references_flat = []
@@ -78,7 +78,7 @@ def read_v10(data_path):
                 for line in dblp:
                     paper = json.loads(line)
                     idx = ledger.id2idx(paper["id"])
-                    papers.append({"title": paper.get("title", ''),
+                    papers[idx]({"title": paper.get("title", ''),
                                    "authors": paper.get("authors", []),
                                    "venue": paper.get("venue", ''),
                                    "year": paper.get("year", 0),
