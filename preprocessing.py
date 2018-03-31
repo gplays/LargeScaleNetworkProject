@@ -3,18 +3,15 @@ import json
 import os
 from os import path
 
-import graph_tool.all as gt
-import igraph
-
 VALUE_TYPES = {"title": "string",
                "authors": "string",
                "venue": "string",
                "year": "int",
                "abstract": "string", }
+DEFAULT_V = "v10"
 
 
-def preprocess(dumpGraph=True, dumpRawData=False, v10=True, v8=True,
-               dumpLight=False, data_path=None):
+def preprocess(try_load=True, write=True, v=DEFAULT_V, data_path=None):
     """
     Preprocessing function.
     Warning! can be RAM intensive if experiencing serious slow down consider
@@ -22,113 +19,123 @@ def preprocess(dumpGraph=True, dumpRawData=False, v10=True, v8=True,
 
     :param data_path: path for data storage if not given initialized as ./.data
     :type data_path: str
-    :param dumpGraph: Set to True to Dump the iGraph version
-    :type dumpGraph: bool
-    :param dumpRawData: Set to True to dump roughly preprocessed files
-    :type dumpRawData: bool
-    :param v10: Set to true to preprocess DBLP-citation network V10
-    :type v10: bool
-    :param v8: Set to true to preprocess ACM-citation network V8
-    :type v8: bool
-    :param dumpLight: Set to True to dump a subgraph for testing purposes
-    Currently unsupported
-    :type dumpLight: bool
-    :return:
-    :rtype:
+    :param write: Set to True to write the preprocessed data to files
+    :type write: bool
+    :param try_load: Set to True to check for existing preprocessed files
+    :type try_load: bool
+    :param v: Set to v10 to preprocess DBLP-citation network V10
+              Set to v8 to preprocess ACM-citation network V8
+    :type v: str
+    :return: preprocessed network
+    :rtype: dict
     """
+
     if data_path is None:
-        # Automatically get the path of the file
-        my_path = path.dirname(path.realpath(__file__))
-        # Assume data is in an already existing data directory at the same
-        # level as
-        # this file
-        data_path = path.join(my_path, ".data")
+        data_path = get_data_path()
+    out_dir = path.join(data_path, v)
 
-    if v10 and v8:
-        preprocess(dumpGraph, dumpRawData, False, True, dumpLight)
+    parsed_data = None
+    if try_load:
+        parsed_data = maybe_load_raw(out_dir)
 
-    if v10:
-        parsed_data = read_v10(data_path)
-    elif v8:
-        parsed_data = read_v8(data_path)
-    else:
-        raise ValueError("v10 or v8 value must be set to True, otherwise "
-                         "there is no target data to preprocess")
+    if parsed_data is None:
+        # Creating the dir corresponding to the version
+        # Ignore error if dir exists (shouldn't happen but if it does
+        # shouldn't raie error)
+        try:
+            os.mkdir(out_dir)
+        except FileExistsError:
+            pass
 
-    if dumpRawData:
-        write_raw(data_path, parsed_data)
-    graph, withIgraph = create_graph(parsed_data)
-    if dumpGraph:
-        graph.write_pickle()
+        if v == "v10":
+            parsed_data = read_v10(data_path)
+        elif v == "v8":
+            parsed_data = read_v8(data_path)
+        else:
+            raise ValueError("v10 or v8 value must be set to True, otherwise "
+                             "there is no target data to preprocess")
 
+        if write:
+            write_raw(out_dir, parsed_data)
 
-def create_graph(parsed_data, withIgraph=True):
-    if withIgraph:
-        g = igraph.Graph(directed=True)
-        g.add_vertices([i for i in range(parsed_data["papers"])])
-        g.add_edges(parsed_data["references_flat"])
-    else:
-        g = gt.Graph()
-        g.add_vertex(n=parsed_data[len(parsed_data["papers"])])
-        g.add_edge_list(parsed_data["references_flat"])
-
-    return g, withIgraph
-
-
-def add_vertices_attributes(g, attr, vals, withIgraph=True,
-                            value_type=None):
-    if withIgraph:
-        g.vs[attr] = vals
-    else:
-        assert value_type is not None, "with graph tool you need to provide \
-                                        the value_type"
-        g.vp[attr] = gt.new_vp(value_type, vals=None)
+    return parsed_data
 
 
 def read_v10(data_path):
+    """
+    Preprocess data following the format of dblp v10 from aminer website:
+    a dir dblp-ref containing json files
+    return dict containing:
+        papers
+        first_authors
+        collaboration_authors
+        references_flat
+        n_nodes
+    :param data_path:
+    :type data_path:
+    :return:
+    :rtype:
+    """
     papers = []
     first_authors = {}
     collaboration_authors = {}
     references_flat = []
-    id2idx = {}
-    idx = 0
-    for root, dirs, files in os.walk(path.join(data_path, "dblp-ref")):
+    ledger = Ledger()
+    dblp_path = path.join(data_path, "dblp-ref")
+    for root, dirs, files in os.walk(dblp_path):
         for file in files:
 
-            with open(path.join(data_path, "dblp.v10", file))as dblp:
+            with open(path.join(dblp_path, file))as dblp:
                 for line in dblp:
                     paper = json.loads(line)
-                    id2idx[paper["id"]] = idx
-                    papers[idx] = {"title": paper["title"],
-                                   "authors": paper["authors"],
-                                   "venue": paper["venue"],
-                                   "year": paper["year"],
-                                   "abstract": paper["abstract"],
-                                   }
+                    idx = ledger.id2idx(paper["id"])
+                    papers.append({"title": paper.get("title", ''),
+                                   "authors": paper.get("authors", []),
+                                   "venue": paper.get("venue", ''),
+                                   "year": paper.get("year", 0),
+                                   "abstract": paper.get("abstract", ''),
+                                   })
 
                     safe_append(first_authors, paper["authors"][0], idx)
 
-                    for author in paper["authors"]:
+                    for author in paper.get("authors", []):
                         safe_append(collaboration_authors, author, idx)
 
-                    for reference in paper["references"]:
-                        references_flat.append(([paper["id"]], reference))
+                    for reference in paper.get("references", []):
+                        references_flat.append((paper["id"], reference))
 
-                idx += 1
-    references_flat = [(id2idx[e[0]], id2idx[e[1]]) for e in references_flat]
+    references_flat = [(ledger.id2idx(x), ledger.id2idx(y))
+                       for x, y in references_flat]
     parsed_data = {"papers": papers,
                    "first_authors": first_authors,
                    "collaboration_authors": collaboration_authors,
-                   "references_flat": references_flat}
+                   "references_flat": references_flat,
+                   "n_nodes": ledger.index}
     return parsed_data
 
 
 def read_v8(data_path):
+    """
+
+    Preprocess data following the format of acm v8 from aminer website:
+    a single text file citation-acm-v8.txt
+    with specific code at he beginning of each line
+    return dict containing:
+        papers
+        first_authors
+        collaboration_authors
+        references_flat
+        n_nodes
+    :param data_path:
+    :type data_path:
+    :return:
+    :rtype:
+    """
     papers = []
     first_authors = {}
     collaboration_authors = {}
     references_flat = []
-    id2idx = {}
+    ledger = Ledger()
     idx = 0
     with open(path.join(data_path, "citation-acm-v8.txt")) as acm:
         # TODO the default value for the year is 0, might neeed further
@@ -148,19 +155,22 @@ def read_v8(data_path):
                     venue = line[2:-1]
                 if "i" == line[1]:
                     paper_id = line[6:-1]
-                    id2idx[paper_id] = idx
+                    idx = ledger.id2idx(paper_id)
                 if "%" == line[1]:
-                    references_flat.append((paper_id, int(line[2:-1])))
+                    references_flat.append((paper_id, line[2:-1]))
                 if "!" == line[1]:
                     abstract = line[2:-1]
             else:
-                papers[idx] = {"title": title,
+                papers.append({"title": title,
                                "authors": authors,
                                "venue": venue,
                                "year": year,
                                "abstract": abstract,
-                               }
-                safe_append(first_authors, authors[0], idx)
+                               })
+                try:
+                    safe_append(first_authors, authors[0], idx)
+                except IndexError:
+                    pass
                 for author in authors:
                     safe_append(collaboration_authors, author, idx)
 
@@ -168,59 +178,123 @@ def read_v8(data_path):
                 paper_id, title, authors, venue, year, abstract = (-1, '', [],
                                                                    '', 0, '')
 
-    references_flat = [[id2idx[e[0]], id2idx[e[1]]] for e in references_flat]
+    references_flat = [(ledger.id2idx(x), ledger.id2idx(y))
+                       for x, y in references_flat]
     parsed_data = {"papers": papers,
                    "first_authors": first_authors,
                    "collaboration_authors": collaboration_authors,
-                   "references_flat": references_flat}
+                   "references_flat": references_flat,
+                   "n_nodes": ledger.index}
     return parsed_data
 
 
 def write_raw(data_path, parsed_data):
-    with open(path.join(data_path, "papers", "w")) as f:
+    """
+    Write the content of the parsed_data dict to a file
+    :param data_path: path for data storage
+    :type data_path: str
+    :param parsed_data:
+    :type parsed_data:
+    """
+    with open(path.join(data_path, "papers"), "w") as f:
         json.dump(parsed_data["papers"], f)
-    with open(path.join(data_path, "papers_id", "w")) as f:
-        for key in parsed_data["papers"].keys():
-            f.write(str(key) + "\n")
-    with open(path.join(data_path, "first_authors", "w")) as f:
+    with open(path.join(data_path, "n_nodes"), "w") as f:
+        f.write(str(parsed_data["n_nodes"]))
+    with open(path.join(data_path, "first_authors"), "w") as f:
         json.dump(parsed_data["first_authors"], f)
-    with open(path.join(data_path, "collaboration_authors", "w")) as f:
+    with open(path.join(data_path, "collaboration_authors"), "w") as f:
         json.dump(parsed_data["collaboration_authors"], f)
-    with open(path.join(data_path, "references_flat", "w")) as f:
+    with open(path.join(data_path, "references_flat"), "w") as f:
         writer = csv.writer(f)
         for ref in parsed_data["references_flat"]:
             writer.writerow(ref)
 
 
-def load_raw(data_path, net_struct=False):
+def maybe_load_raw(data_path):
     """
-
+    Load the content of the files.
+    If they exist if not don't raise error but return parsed_data=None
     :param data_path: path for data storage
     :type data_path: str
-    :param net_struct: Set to True to read only nodes and edges from the network
-    :type net_struct: bool
     :return: parsed data
     :rtype: dict
     """
     parsed_data = {}
-
-    with open(path.join(data_path, "papers_id", "r")) as f:
-        parsed_data["keys"] = [int(i) for i in f]
-    with open(path.join(data_path, "references_flat", "r")) as f:
-        reader = csv.reader(f)
-        parsed_data["references_flat"] = [row for row in reader]
-    if not net_struct:
-        with open(path.join(data_path, "papers", "r")) as f:
+    try:
+        with open(path.join(data_path, "n_nodes"), "r") as f:
+            parsed_data["n_nodes"] = int(f.read())
+        with open(path.join(data_path, "references_flat"), "r") as f:
+            reader = csv.reader(f)
+            parsed_data["references_flat"] = [ref for ref in reader]
+        with open(path.join(data_path, "papers"), "r") as f:
             parsed_data["papers"] = json.load(f)
-        with open(path.join(data_path, "first_authors", "r")) as f:
+        with open(path.join(data_path, "first_authors"), "r") as f:
             parsed_data["first_authors"] = json.load(f)
-        with open(path.join(data_path, "collaboration_authors", "r")) as f:
+        with open(path.join(data_path, "collaboration_authors"), "r") as f:
             parsed_data["collaboration_authors"] = json.load(f)
+    except FileNotFoundError:
+        parsed_data = None
+        print("load failed will reprocess file")
     return parsed_data
 
 
-def safe_append(dict, id, elem):
+###################################
+## Utility functions and classes ##
+
+class Ledger(object):
+    """
+    Ledger object to keep track of papers id
+    Main functon used is id2idx
+    Might be one day extended to allow node selection, filtering and reindexing
+    """
+
+    def __init__(self):
+        self.index = 0
+        self.ids = []
+        self.id2index = {}
+
+    def id2idx(self, my_id):
+        """
+        Return the index attributed to this id and if it is the first time
+        this id is processed, will attribute it an id
+
+        :param my_id: paper id could be a string or a number
+        :type my_id: str
+        :return: index of the paper
+        :rtype: int
+        """
+        try:
+            idx = self.id2index[my_id]
+        except KeyError:
+            self.id2index[my_id] = self.index
+            self.ids.append(my_id)
+            idx = self.index
+            self.index += 1
+        return idx
+
+    def idx2id(self, idx):
+        return self.ids[idx]
+
+
+def get_data_path():
+    # Automatically get the path of the file
+    # Assume data is in an already existing data directory at the same
+    # level as this file
+    my_path = path.dirname(path.realpath(__file__))
+    data_path = path.join(my_path, ".data")
+    return data_path
+
+
+def safe_append(my_dict, my_id, elem):
+    """
+    Simple safe appending function for adding an element to a list in a dict
+    when the list might not have been initialised
+    """
     try:
-        dict[id].append(elem)
+        my_dict[my_id].append(elem)
     except KeyError:
-        dict[id] = [elem]
+        my_dict[my_id] = [elem]
+
+
+if __name__ == "__main__":
+    preprocess()
