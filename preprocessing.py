@@ -3,53 +3,42 @@ import json
 import os
 from os import path
 
-VALUE_TYPES = {"title": "string",
-               "authors": "string",
-               "venue": "string",
-               "year": "int",
-               "abstract": "string", }
-DEFAULT_V = "v10"
+DEFAULT_DATASET = "v8"
 
 
-def preprocess(try_load=True, write=True, v=DEFAULT_V, data_path=None):
+def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
+               data_path=None):
     """
     Preprocessing function.
     Warning! can be RAM intensive if experiencing serious slow down consider
     asking for preprocessed files from a comrade
 
+    :param version: version of the graph
+    :type version: int
     :param data_path: path for data storage if not given initialized as ./.data
     :type data_path: str
     :param write: Set to True to write the preprocessed data to files
     :type write: bool
     :param try_load: Set to True to check for existing preprocessed files
     :type try_load: bool
-    :param v: Set to v10 to preprocess DBLP-citation network V10
+    :param dataset: Set to v10 to preprocess DBLP-citation network V10
               Set to v8 to preprocess ACM-citation network V8
-    :type v: str
+    :type dataset: str
     :return: preprocessed network
     :rtype: dict
     """
 
-    if data_path is None:
-        data_path = get_data_path()
-    out_dir = path.join(data_path, v)
+    data_path, out_dir = get_data_path(dataset, version, data_path)
 
     parsed_data = None
     if try_load:
         parsed_data = maybe_load_raw(out_dir)
 
     if parsed_data is None:
-        # Creating the dir corresponding to the version
-        # Ignore error if dir exists (shouldn't happen but if it does
-        # shouldn't raie error)
-        try:
-            os.mkdir(out_dir)
-        except FileExistsError:
-            pass
 
-        if v == "v10":
+        if dataset == "v10":
             parsed_data = read_v10(data_path)
-        elif v == "v8":
+        elif dataset == "v8":
             parsed_data = read_v8(data_path)
         else:
             raise ValueError("v10 or v8 value must be set to True, otherwise "
@@ -276,13 +265,35 @@ class Ledger(object):
         return self.ids[idx]
 
 
-def get_data_path():
-    # Automatically get the path of the file
-    # Assume data is in an already existing data directory at the same
-    # level as this file
-    my_path = path.dirname(path.realpath(__file__))
-    data_path = path.join(my_path, ".data")
-    return data_path
+def get_data_path(v, version, root=None):
+    """
+
+    :param v: dataset name
+    :type v: str
+    :param version: project version
+    :type version: int
+    :param root: If given, is used as data_path
+    :type root: str
+    :return: path to dataset and path to output_dirs
+    :rtype: (str,str)
+    """
+    if root is None:
+        # Automatically get the path of the file
+        # Assume data is in an already existing data directory at the same
+        # level as this file
+        my_path = path.dirname(path.realpath(__file__))
+        data_path = path.join(my_path, ".data")
+    else:
+        data_path = root
+    out_dir = path.join(data_path, v + "." + str(version))
+    # Creating the dir corresponding to the version
+    # Ignore error if dir exists (shouldn't happen but if it does
+    # shouldn't raie error)
+    try:
+        os.mkdir(out_dir)
+    except FileExistsError:
+        pass
+    return data_path, out_dir
 
 
 def safe_append(my_dict, my_id, elem):
