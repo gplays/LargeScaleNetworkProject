@@ -32,7 +32,7 @@ def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
 
     parsed_data = None
     if try_load:
-        parsed_data = maybe_load_raw(out_dir)
+        parsed_data = maybe_load_raw(data_path, dataset)
 
     if parsed_data is None:
 
@@ -45,7 +45,7 @@ def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
                              "there is no target data to preprocess")
 
         if write:
-            write_raw(out_dir, parsed_data)
+            write_raw(data_path, parsed_data, dataset)
 
     return parsed_data
 
@@ -120,7 +120,7 @@ def read_v8(data_path):
     :return:
     :rtype:
     """
-    papers = []
+    papers = {}
     first_authors = {}
     collaboration_authors = {}
     references_flat = []
@@ -176,14 +176,17 @@ def read_v8(data_path):
     return parsed_data
 
 
-def write_raw(data_path, parsed_data):
+def write_raw(data_path, parsed_data, dataset):
     """
     Write the content of the parsed_data dict to a file
+    :param dataset: dataset being preprocessed
+    :type dataset: str
     :param data_path: path for data storage
     :type data_path: str
     :param parsed_data:
     :type parsed_data:
     """
+    data_path = path.join(data_path, str(dataset))
     with open(path.join(data_path, "papers"), "w") as f:
         json.dump(parsed_data["papers"], f)
     with open(path.join(data_path, "n_nodes"), "w") as f:
@@ -198,15 +201,18 @@ def write_raw(data_path, parsed_data):
             writer.writerow(ref)
 
 
-def maybe_load_raw(data_path):
+def maybe_load_raw(data_path, dataset):
     """
     Load the content of the files.
     If they exist if not don't raise error but return parsed_data=None
     :param data_path: path for data storage
     :type data_path: str
+    :param dataset: dataset being preprocessed
+    :type dataset: str
     :return: parsed data
     :rtype: dict
     """
+    data_path = path.join(data_path, str(dataset))
     parsed_data = {}
     try:
         with open(path.join(data_path, "n_nodes"), "r") as f:
@@ -222,7 +228,7 @@ def maybe_load_raw(data_path):
             parsed_data["collaboration_authors"] = json.load(f)
     except FileNotFoundError:
         parsed_data = None
-        print("load failed will reprocess file")
+        print("load at {} failed will reprocess file".format(data_path))
     return parsed_data
 
 
@@ -264,11 +270,11 @@ class Ledger(object):
         return self.ids[idx]
 
 
-def get_data_path(v, version, root=None):
+def get_data_path(dataset, version, root=None):
     """
 
-    :param v: dataset name
-    :type v: str
+    :param dataset: dataset name
+    :type dataset: str
     :param version: project version
     :type version: int
     :param root: If given, is used as data_path
@@ -284,14 +290,15 @@ def get_data_path(v, version, root=None):
         data_path = path.join(my_path, ".data")
     else:
         data_path = root
-    out_dir = path.join(data_path, v + "." + str(version))
-    # Creating the dir corresponding to the version
-    # Ignore error if dir exists (shouldn't happen but if it does
-    # shouldn't raie error)
-    try:
-        os.mkdir(out_dir)
-    except FileExistsError:
-        pass
+    out_dir = path.join(data_path, dataset + "." + str(version))
+    # Creating the dir corresponding to the datatset (raw data) and for the
+    # version (graph)
+    for my_path in [out_dir, path.join(data_path, dataset)]:
+        try:
+            os.mkdir(my_path)
+        except FileExistsError:
+            pass
+
     return data_path, out_dir
 
 

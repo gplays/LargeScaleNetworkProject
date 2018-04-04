@@ -51,7 +51,7 @@ def load_or_create_graph(try_load=True, write=True, withIgraph=IGRAPH,
                                  version=version)
         graph = create_graph(parsed_data, withIgraph, out_dir, dump_graph=write)
     else:
-        parsed_data = maybe_load_raw(data_path)
+        parsed_data = maybe_load_raw(data_path,dataset)
 
     return graph, parsed_data
 
