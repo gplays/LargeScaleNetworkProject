@@ -124,7 +124,7 @@ def read_daten(data_path):
     first_authors = {}
     collaboration_authors = {}
     ledger = Ledger()
-    with open(path.join(data_path, "astro-ALP-2003-2010.csv")) as f:
+    with open(path.join(data_path, "daten", "astro-ALP-2003-2010.csv")) as f:
         reader = csv.reader(f)
         first_line = next(reader)
         id_idx = first_line.index("UT")
@@ -150,7 +150,7 @@ def read_daten(data_path):
             for author in authors:
                 safe_append(collaboration_authors, author, idx)
 
-    with open(path.join(data_path, "direct_citations.txt")) as f:
+    with open(path.join(data_path, "daten", "direct_citations.txt")) as f:
         reader = csv.reader(f, delimiter='\t')
         next(reader)
         references_flat = [(ledger.id2idx(x), ledger.id2idx(y))
