@@ -3,7 +3,7 @@ import json
 import os
 from os import path
 
-DEFAULT_DATASET = "daten"
+DEFAULT_DATASET = "astro"
 
 
 def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
@@ -33,14 +33,12 @@ def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
     parsed_data = None
     if try_load:
         parsed_data = maybe_load_raw(data_path, dataset)
-
     if parsed_data is None:
-
         if dataset == "v10":
             parsed_data = read_v10(data_path)
         elif dataset == "v8":
             parsed_data = read_v8(data_path)
-        elif dataset == "daten":
+        elif dataset == "astro":
             parsed_data = read_daten(data_path)
         else:
             raise ValueError("v10 or v8 value must be set to True, otherwise "
