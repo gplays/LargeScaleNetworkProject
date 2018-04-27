@@ -3,7 +3,7 @@ import json
 import os
 from os import path
 
-DEFAULT_DATASET = "v8"
+DEFAULT_DATASET = "daten"
 
 
 def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
@@ -40,6 +40,8 @@ def preprocess(try_load=True, write=True, dataset=DEFAULT_DATASET, version=1,
             parsed_data = read_v10(data_path)
         elif dataset == "v8":
             parsed_data = read_v8(data_path)
+        elif dataset == "daten":
+            parsed_data = read_daten(data_path)
         else:
             raise ValueError("v10 or v8 value must be set to True, otherwise "
                              "there is no target data to preprocess")
@@ -95,6 +97,64 @@ def read_v10(data_path):
 
     references_flat = [(ledger.id2idx(x), ledger.id2idx(y))
                        for x, y in references_flat]
+    parsed_data = {"papers": papers,
+                   "first_authors": first_authors,
+                   "collaboration_authors": collaboration_authors,
+                   "references_flat": references_flat,
+                   "n_nodes": ledger.index}
+    return parsed_data
+
+
+def read_daten(data_path):
+    """
+       Preprocess data following the format of dblp v10 from aminer website:
+       a dir dblp-ref containing json files
+       return dict containing:
+           papers
+           first_authors
+           collaboration_authors
+           references_flat
+           n_nodes
+       :param data_path:
+       :type data_path:
+       :return:
+       :rtype:
+       """
+    papers = {}
+    first_authors = {}
+    collaboration_authors = {}
+    ledger = Ledger()
+    with open(path.join(data_path, "astro-ALP-2003-2010.csv")) as f:
+        reader = csv.reader(f)
+        first_line = next(reader)
+        id_idx = first_line.index("UT")
+        title_idx = first_line.index("TI")
+        authors_idx = first_line.index("AU")
+        venue_idx = first_line.index("SO")
+        year_idx = first_line.index("PY")
+        abstract_idx = first_line.index("AB")
+        for line in reader:
+            paper_id = line[id_idx]
+            authors = line[authors_idx].split(";")
+            authors = [a.replace("\"", "").strip() for a in authors]
+            idx = ledger.id2idx(paper_id)
+            papers[idx] = {"title": line[title_idx],
+                           "authors": authors,
+                           "venue": line[venue_idx],
+                           "year": line[year_idx],
+                           "abstract": line[abstract_idx],
+                           }
+
+            safe_append(first_authors, authors[0], idx)
+
+            for author in authors:
+                safe_append(collaboration_authors, author, idx)
+
+    with open(path.join(data_path, "direct_citations.txt")) as f:
+        reader = csv.reader(f, delimiter='\t')
+        next(reader)
+        references_flat = [(ledger.id2idx(x), ledger.id2idx(y))
+                           for (x, y) in reader]
     parsed_data = {"papers": papers,
                    "first_authors": first_authors,
                    "collaboration_authors": collaboration_authors,
